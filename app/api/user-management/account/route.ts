@@ -10,23 +10,28 @@ export async function GET() {
     if (!session) {
       return NextResponse.json(
         { message: 'Unauthorized request' },
-        { status: 401 }, // Unauthorized
+        { status: 401 }
       );
     }
 
-    // Fetch the user based on the email in the session
+    // Guard email to satisfy TypeScript and avoid null/undefined at runtime
+    const email = typeof session.user?.email === 'string' ? session.user.email : undefined;
+    if (!email) {
+      return NextResponse.json(
+        { message: 'Unauthorized: missing email in session' },
+        { status: 401 }
+      );
+    }
+
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: {
-        role: true,
-      },
+      where: { email },
+      include: { role: true },
     });
 
-    // Check if record exists
     if (!user) {
       return NextResponse.json(
         { message: 'Record not found. Someone might have deleted it already.' },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -34,7 +39,7 @@ export async function GET() {
   } catch {
     return NextResponse.json(
       { message: 'Oops! Something went wrong. Please try again in a moment.' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
