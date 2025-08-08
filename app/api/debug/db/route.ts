@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
-    // Basic connectivity + data check
     const count = await prisma.user.count()
     const user = await prisma.user.findUnique({
       where: { email: 'andrew@curatehealth.co.uk' },
@@ -13,7 +12,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       envHasDbUrl: Boolean(process.env.DATABASE_URL),
-      dbUrlHostHint: process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] ?? null, // helpful but not secrets
+      dbUrlHostHint: process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] ?? null,
       userCount: count,
       foundUser: Boolean(user),
       userPreview: user
