@@ -283,23 +283,7 @@ export default function Page() {
             />
           </div>
 
-          <div className="flex flex-col gap-2.5">
-            <RecaptchaPopover
-              onOpenChange={(open) => {
-                if (!open) {
-                }
-              }}
-              onVerify={handleVerifiedSubmit}
-              trigger={
-                <Button type="submit" disabled={isProcessing}>
-                  {isProcessing ? (
-                    <LoaderCircleIcon className="size-4 animate-spin" />
-                  ) : null}
-                  Continue
-                </Button>
-              }
-            />
-          </div>
+         
 
           <div className="text-sm text-muted-foreground text-center">
             Already have an account?{' '}

@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { LoaderCircleIcon } from 'lucide-react';
-import { RecaptchaPopover } from '@/components/common/recaptcha-popover';
 
 export default function Page() {
   const [error, setError] = useState<string | null>(null);
@@ -134,25 +133,7 @@ export default function Page() {
             )}
           />
 
-          <RecaptchaPopover
-            open={showRecaptcha}
-            onOpenChange={(open) => {
-              if (!open) {
-                setShowRecaptcha(false);
-              }
-            }}
-            onVerify={handleVerifiedSubmit}
-            trigger={
-              <Button
-                type="submit"
-                disabled={!!success || isProcessing}
-                className="w-full"
-              >
-                {isProcessing ? <LoaderCircleIcon className="animate-spin" /> : null}
-                Submit
-              </Button>
-            }
-          />
+          
 
           <div className="space-y-3">
             <Button type="button" variant="outline" className="w-full" asChild>
