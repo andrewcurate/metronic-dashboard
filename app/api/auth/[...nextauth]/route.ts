@@ -1,68 +1,76 @@
-import NextAuth, { type NextAuthOptions, type User as NextAuthUser, type Session } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
+// app/api/auth/[...nextauth]/route.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import type { JWT } from "next-auth/jwt";
 
 const prisma = new PrismaClient();
 
-type JwtWithUserId = JWT & { userId?: string };
-type SessionWithUserId = Session & { userId?: string };
-
-const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt" },
-  secret: process.env.NEXTAUTH_SECRET,
-
+export const authOptions = {
   providers: [
-    Credentials({
+    CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "text" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      authorize: async (credentials) => {
+      async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
           include: { role: true },
         });
-        if (!user || !user.password) return null;
 
-        const ok = await bcrypt.compare(credentials.password, user.password);
-        if (!ok) return null;
+        if (!user) return null;
+        if (!user.password) return null;
 
-        // Your app’s NextAuth.User has a required `status` field (augmented type).
-        // Build an object that includes it and cast to NextAuthUser (no `any`).
-        const nextUser = {
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) return null;
+
+        return {
           id: user.id,
-          email: user.email ?? undefined,
-          name: user.name ?? undefined,
-          status: user.status, // <- required by your augmented NextAuth User
-        } as unknown as NextAuthUser;
-
-        return nextUser;
+          email: user.email,
+          name: user.name,
+          role: user.role?.slug ?? null,
+          status: user.status ?? null,
+        };
       },
     }),
   ],
-
   callbacks: {
-    async jwt({ token, user }): Promise<JwtWithUserId> {
-      const t = token as JwtWithUserId;
-      if (user && "id" in user && typeof (user as { id?: unknown }).id === "string") {
-        t.userId = (user as { id: string }).id;
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = (user as any).id;
+        token.role = (user as any).role ?? null;
+        token.status = (user as any).status ?? null;
       }
-      return t;
+      return token;
     },
-    async session({ session, token }): Promise<SessionWithUserId> {
-      const t = token as JwtWithUserId;
-      return {
-        ...session,
-        userId: t.userId,
-      };
+    async session({ session, token }) {
+      if (token && session?.user) {
+        // @ts-expect-error custom field
+        session.user.id = token.id as string;
+        // @ts-expect-error custom field
+        session.user.role = (token as any)?.role ?? null;
+        // @ts-expect-error custom field
+        session.user.status = (token as any)?.status ?? null;
+      }
+      return session;
     },
+  },
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+  pages: {
+    signIn: "/signin",
   },
 };
 
 const handler = NextAuth(authOptions);
+
 export { handler as GET, handler as POST };
