@@ -1,8 +1,7 @@
-import NextAuth, { type NextAuthOptions } from "next-auth";
+import NextAuth, { type NextAuthOptions, type User as NextAuthUser, type Session } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import type { Session } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 
 const prisma = new PrismaClient();
@@ -33,12 +32,16 @@ const authOptions: NextAuthOptions = {
         const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return null;
 
-        // Return a minimal user object; NextAuth will put this into the JWT once
-        return {
+        // Your app’s NextAuth.User has a required `status` field (augmented type).
+        // Build an object that includes it and cast to NextAuthUser (no `any`).
+        const nextUser = {
           id: user.id,
-          email: user.email,
+          email: user.email ?? undefined,
           name: user.name ?? undefined,
-        };
+          status: user.status, // <- required by your augmented NextAuth User
+        } as unknown as NextAuthUser;
+
+        return nextUser;
       },
     }),
   ],
