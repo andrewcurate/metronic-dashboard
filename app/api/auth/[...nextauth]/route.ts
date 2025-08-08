@@ -1,67 +1,96 @@
-import NextAuth, { NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// app/api/auth/[...nextauth]/route.ts
+import NextAuth, { NextAuthOptions, DefaultSession } from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import { PrismaClient, UserStatus } from "@prisma/client";
+import { compare } from "bcryptjs";
+import { z } from "zod";
+import type { JWT } from "next-auth/jwt";
 
 const prisma = new PrismaClient();
 
+// ---- Module augmentation so we can safely add fields to token/session
+declare module "next-auth" {
+  interface Session {
+    user: DefaultSession["user"] & {
+      id: string;
+      role?: string;
+    };
+  }
+}
+declare module "next-auth/jwt" {
+  interface JWT {
+    userId?: string;
+    role?: string;
+  }
+}
+
+// ---- Validate incoming creds
+const credentialsSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
+  session: { strategy: "jwt" },
   providers: [
-    CredentialsProvider({
+    Credentials({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
+      authorize: async (
+        rawCreds
+      ): Promise<{ id: string; email: string; name: string | null; role?: string } | null> => {
+        const parsed = credentialsSchema.safeParse(rawCreds);
+        if (!parsed.success) return null;
 
-        // Find the user by email
+        const { email, password } = parsed.data;
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase().trim() },
+          where: { email },
           include: { role: true },
         });
+        if (!user || !user.password) return null;
 
-        if (!user || !user.password) {
-          return null;
-        }
+        // If you enforce ACTIVE users only, keep this check
+        if (user.status && user.status !== UserStatus.ACTIVE) return null;
 
-        // Compare the entered password to the stored bcrypt hash
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) {
-          return null;
-        }
+        const ok = await compare(password, user.password);
+        if (!ok) return null;
 
-        // Return user object for the session/JWT
         return {
           id: user.id,
           email: user.email,
-          name: user.name,
-          role: user.role?.slug || "user",
+          name: user.name ?? null,
+          role: user.role?.slug,
         };
       },
     }),
   ],
+  pages: {
+    signIn: "/signin",
+  },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }): Promise<JWT> {
       if (user) {
-        token.role = (user as any).role;
+        // user comes from authorize()
+        const u = user as { id: string; role?: string };
+        token.userId = u.id;
+        if (u.role) token.role = u.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).role = token.role;
+        session.user.id = (token.userId as string) ?? "";
+        if (token.role) session.user.role = token.role;
       }
       return session;
     },
-  },
-  pages: {
-    signIn: "/signin", // Adjust if your login page is different
   },
 };
 
