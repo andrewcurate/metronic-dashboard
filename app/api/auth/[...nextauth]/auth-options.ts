@@ -1,133 +1,124 @@
 // app/api/auth/[...nextauth]/auth-options.ts
-import type { NextAuthOptions, User as NextAuthUser, Session } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import type { JWT } from "next-auth/jwt";
-import type { AdapterUser } from "next-auth/adapters";
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import { z } from "zod";
+import type { NextAuthOptions, User as NextAuthUser } from 'next-auth'
+import CredentialsProvider from 'next-auth/providers/credentials'
+import { compare } from 'bcryptjs'
+import type { JWT } from 'next-auth/jwt'
+import { prisma } from '@/lib/prisma'
 
-const credentialsSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
+/**
+ * We rely on your module augmentation in next-auth.d.ts:
+ * - Session.user: { id, name, email, avatar?, roleId?, roleName?, status }
+ * - JWT: { id, name, email, avatar?, roleId?, roleName?, status }
+ */
 
-const isProd = process.env.NODE_ENV === "production";
-
-const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt" },
+export const authOptions: NextAuthOptions = {
+  session: { strategy: 'jwt' },
+  secret: process.env.NEXTAUTH_SECRET,
 
   providers: [
     CredentialsProvider({
-      name: "Credentials",
+      name: 'Credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
       },
-      // NOTE: remove unused _req param to satisfy ESLint
-      async authorize(rawCreds) {
-        const parsed = credentialsSchema.safeParse(rawCreds ?? {});
-        if (!parsed.success) return null;
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
 
-        const { email, password } = parsed.data;
-
+        // Get the user and include role for roleName
         const user = await prisma.user.findUnique({
-          where: { email },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            password: true,
-            status: true,
-            avatar: true,
-            roleId: true,
-            role: { select: { name: true } },
-          },
-        });
+          where: { email: credentials.email },
+          include: { role: true },
+        })
 
-        if (!user || !user.password) return null;
-        if (user.status !== "ACTIVE") return null;
+        if (!user || !user.password) {
+          return null
+        }
 
-        const ok = await bcrypt.compare(password, user.password);
-        if (!ok) return null;
+        const passwordOk = await compare(credentials.password, user.password)
+        if (!passwordOk) {
+          return null
+        }
 
-        const out: NextAuthUser = {
+        // Block non-active accounts
+        if (user.status !== 'ACTIVE') {
+          return null
+        }
+
+        // Build the shape NextAuth expects, plus our extra fields (typed via module augmentation)
+        const base = {
           id: user.id,
-          name: user.name ?? "",
           email: user.email,
-          image: user.avatar ?? undefined,
-        };
-        // augment so we can forward via JWT callback
-        // (these match your next-auth.d.ts augmentation)
-        // @ts-expect-error custom fields passed via jwt callback
-        out.roleId = user.roleId ?? null;
-        // @ts-expect-error custom fields passed via jwt callback
-        out.roleName = user.role?.name ?? null;
-        // @ts-expect-error custom fields passed via jwt callback
-        out.status = user.status;
+          name: user.name ?? undefined,
+        }
 
-        return out;
+        // Return as NextAuthUser (extra fields are supported via your augmentation)
+        const authUser = {
+          ...base,
+          avatar: user.avatar ?? null,
+          roleId: user.roleId ?? null,
+          roleName: user.role?.name ?? null,
+          status: user.status,
+        } satisfies NextAuthUser & {
+          avatar?: string | null
+          roleId?: string | null
+          roleName?: string | null
+          status: string
+        }
+
+        // NextAuth only *requires* id/email/name here; the rest we’ll copy onto JWT in the callback
+        return authUser
       },
     }),
   ],
 
   callbacks: {
-    // Remove unused account/profile to satisfy ESLint
-    async jwt({
-      token,
-      user,
-    }: {
-      token: JWT;
-      user?: NextAuthUser | AdapterUser;
-    }): Promise<JWT> {
+    async jwt({ token, user }) {
+      // token is your augmented JWT type
+      // On initial sign-in, user will be defined — copy fields to the token
       if (user) {
-        token.id = user.id;
-        token.name = user.name ?? token.name;
-        token.email = user.email ?? token.email;
-        // @ts-expect-error carried from authorize()
-        token.roleId = (user as NextAuthUser & { roleId?: string | null }).roleId ?? null;
-        // @ts-expect-error carried from authorize()
-        token.roleName = (user as NextAuthUser & { roleName?: string | null }).roleName ?? null;
-        // @ts-expect-error carried from authorize()
-        token.status = (user as NextAuthUser & { status?: string }).status ?? "INACTIVE";
+        const u = user as NextAuthUser & {
+          avatar?: string | null
+          roleId?: string | null
+          roleName?: string | null
+          status?: string
+        }
+
+        // Core fields
+        if (!token.id && 'id' in u && typeof (u as { id?: unknown }).id === 'string') {
+          token.id = (u as unknown as { id: string }).id
+        }
+        token.email = u.email ?? token.email
+        token.name = u.name ?? token.name
+
+        // Extra fields from your augmentation
+        token.avatar = u.avatar ?? null
+        token.roleId = u.roleId ?? null
+        token.roleName = u.roleName ?? null
+        token.status = u.status ?? token.status ?? 'INACTIVE'
       }
-      return token;
+
+      return token as JWT
     },
 
-    async session({
-      session,
-      token,
-    }: {
-      session: Session;
-      token: JWT & {
-        id?: string;
-        roleId?: string | null;
-        roleName?: string | null;
-        status?: string;
-        image?: string | null;
-      };
-    }): Promise<Session> {
-      session.user = {
-        id: (token.id as string) || "",
-        name: (session.user?.name as string) || (token.name as string) || "",
-        email: (session.user?.email as string) || (token.email as string) || "",
-        avatar:
-          (token as unknown as { avatar?: string | null }).avatar ??
-          (token.image ?? null),
-        roleId: token.roleId ?? null,
-        roleName: token.roleName ?? null,
-        status: (token.status as string) || "INACTIVE",
-      };
-      return session;
+    async session({ session, token }) {
+      if (session.user) {
+        // Core fields
+        session.user.id = (token.id as string) ?? session.user.id
+        session.user.email = (token.email as string) ?? session.user.email
+        session.user.name = (token.name as string) ?? session.user.name
+
+        // Extra fields from your augmentation
+        session.user.avatar = (token.avatar as string | null) ?? null
+        session.user.roleId = (token.roleId as string | null) ?? null
+        session.user.roleName = (token.roleName as string | null) ?? null
+        session.user.status = (token.status as string) ?? 'INACTIVE'
+      }
+      return session
     },
   },
+}
 
-  pages: {
-    signIn: "/signin",
-    error: "/signin",
-  },
-
-  debug: !isProd,
-};
-
-export default authOptions;
+export default authOptions
