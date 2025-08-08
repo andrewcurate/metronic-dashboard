@@ -1,40 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// app/api/auth/[...nextauth]/route.ts
-import NextAuth, { NextAuthOptions, DefaultSession } from "next-auth";
+import NextAuth, { type NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaClient, UserStatus } from "@prisma/client";
-import { compare } from "bcryptjs";
-import { z } from "zod";
-import type { JWT } from "next-auth/jwt";
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// ---- Module augmentation so we can safely add fields to token/session
-declare module "next-auth" {
-  interface Session {
-    user: DefaultSession["user"] & {
-      id: string;
-      role?: string;
-    };
-  }
-}
-declare module "next-auth/jwt" {
-  interface JWT {
-    userId?: string;
-    role?: string;
-  }
-}
-
-// ---- Validate incoming creds
-const credentialsSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
-
-export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+// DO NOT export this constant — Next.js route files should only export HTTP verbs.
+const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
+  secret: process.env.NEXTAUTH_SECRET,
+
   providers: [
     Credentials({
       name: "Credentials",
@@ -42,52 +17,39 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      authorize: async (
-        rawCreds
-      ): Promise<{ id: string; email: string; name: string | null; role?: string } | null> => {
-        const parsed = credentialsSchema.safeParse(rawCreds);
-        if (!parsed.success) return null;
-
-        const { email, password } = parsed.data;
+      authorize: async (credentials) => {
+        if (!credentials?.email || !credentials?.password) return null;
 
         const user = await prisma.user.findUnique({
-          where: { email },
-          include: { role: true },
+          where: { email: credentials.email },
+          include: { role: true }, // role relation exists in your schema
         });
         if (!user || !user.password) return null;
 
-        // If you enforce ACTIVE users only, keep this check
-        if (user.status && user.status !== UserStatus.ACTIVE) return null;
-
-        const ok = await compare(password, user.password);
+        const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return null;
 
+        // You can add fields to the JWT via callbacks if you need role info later
         return {
           id: user.id,
           email: user.email,
-          name: user.name ?? null,
-          role: user.role?.slug,
+          name: user.name ?? undefined,
         };
       },
     }),
   ],
-  pages: {
-    signIn: "/signin",
-  },
+
+  // Optional: enrich the JWT/session with role info if you use it in the UI
   callbacks: {
-    async jwt({ token, user }): Promise<JWT> {
+    async jwt({ token, user }) {
       if (user) {
-        // user comes from authorize()
-        const u = user as { id: string; role?: string };
-        token.userId = u.id;
-        if (u.role) token.role = u.role;
+        token.userId = user.id;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = (token.userId as string) ?? "";
-        if (token.role) session.user.role = token.role;
+      if (token?.userId) {
+        (session as any).userId = token.userId;
       }
       return session;
     },
@@ -95,4 +57,6 @@ export const authOptions: NextAuthOptions = {
 };
 
 const handler = NextAuth(authOptions);
+
+// ✅ Only export HTTP verbs
 export { handler as GET, handler as POST };
