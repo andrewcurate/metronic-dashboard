@@ -1,100 +1,150 @@
-import { NextAuthOptions } from "next-auth";
+// app/api/auth/[...nextauth]/auth-options.ts
+import type { NextAuthOptions, User as NextAuthUser, Session, Account, Profile } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
+import type { JWT } from "next-auth/jwt";
+import type { AdapterUser } from "next-auth/adapters";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
+
+const credentialsSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+const isProd = process.env.NODE_ENV === "production";
 
 const authOptions: NextAuthOptions = {
-  debug: true, // Show detailed debug info in Vercel logs
+  session: { strategy: "jwt" },
 
   providers: [
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "text", placeholder: "you@example.com" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      authorize: async (credentials) => {
-        if (!credentials?.email || !credentials?.password) {
-          console.error("Missing email or password in authorize()");
+      async authorize(rawCreds, _req) {
+        // Validate inputs
+        const parsed = credentialsSchema.safeParse(rawCreds ?? {});
+        if (!parsed.success) {
           return null;
         }
+        const { email, password } = parsed.data;
 
-        // Fetch user from DB including password for bcrypt check
+        // Load user (must include password & status)
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase() },
+          where: { email },
           select: {
             id: true,
-            email: true,
             name: true,
-            password: true, // IMPORTANT for bcrypt
+            email: true,
+            password: true,
             status: true,
+            avatar: true,
             roleId: true,
             role: { select: { name: true } },
           },
         });
 
-        if (!user) {
-          console.error("No user found for email:", credentials.email);
+        if (!user || !user.password) {
+          // Avoid leaking which part failed
           return null;
         }
 
+        // Only allow ACTIVE users
         if (user.status !== "ACTIVE") {
-          console.error("User is not active:", user.email);
           return null;
         }
 
-        const passwordMatch = await bcrypt.compare(
-          credentials.password,
-          user.password ?? ""
-        );
+        const ok = await bcrypt.compare(password, user.password);
+        if (!ok) return null;
 
-        if (!passwordMatch) {
-          console.error("Invalid password for email:", user.email);
-          return null;
-        }
-
-        // Return safe user object (without password)
-        return {
+        // Return a minimal user object; extra fields will be added to JWT in callbacks
+        const out: NextAuthUser = {
           id: user.id,
-          email: user.email,
           name: user.name ?? "",
-          roleId: user.roleId ?? null,
-          roleName: user.role?.name ?? null,
-          status: user.status,
+          email: user.email,
+          // NextAuth core only knows image; we’ll copy avatar via JWT in callbacks
+          image: user.avatar ?? undefined,
         };
+        // @ts-expect-error augment at runtime in jwt callback
+        out.roleId = user.roleId ?? null;
+        // @ts-expect-error augment at runtime in jwt callback
+        out.roleName = user.role?.name ?? null;
+        // @ts-expect-error augment at runtime in jwt callback
+        out.status = user.status;
+
+        return out;
       },
     }),
   ],
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({
+      token,
+      user,
+      account,
+      profile,
+    }: {
+      token: JWT;
+      user?: NextAuthUser | AdapterUser;
+      account?: Account | null;
+      profile?: Profile | undefined;
+    }): Promise<JWT> {
+      // On login, copy extra fields from user to token
       if (user) {
         token.id = user.id;
-        token.roleId = user.roleId ?? null;
-        token.roleName = (user as any).roleName ?? null;
-        token.status = (user as any).status ?? null;
+        token.name = user.name ?? token.name;
+        token.email = user.email ?? token.email;
+        // @ts-expect-error copied from authorize() augmentation
+        token.roleId = (user as NextAuthUser & { roleId?: string | null }).roleId ?? null;
+        // @ts-expect-error copied from authorize() augmentation
+        token.roleName = (user as NextAuthUser & { roleName?: string | null }).roleName ?? null;
+        // @ts-expect-error copied from authorize() augmentation
+        token.status = (user as NextAuthUser & { status?: string }).status ?? "INACTIVE";
+        // Map avatar to image if present
+        // NextAuth's JWT doesn't have avatar; keep image consistent
+        if ("image" in user && user.image) {
+          // nothing else to do; session callback will read token.image
+        }
       }
       return token;
     },
 
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string;
-        session.user.roleId = token.roleId as string | null;
-        session.user.roleName = token.roleName as string | null;
-        session.user.status = token.status as string | null;
-      }
+    async session({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: JWT & {
+        id?: string;
+        roleId?: string | null;
+        roleName?: string | null;
+        status?: string;
+      };
+    }): Promise<Session> {
+      // Ensure required shape for your module augmentation
+      session.user = {
+        id: (token.id as string) || "",
+        name: (session.user?.name as string) || (token.name as string) || "",
+        email: (session.user?.email as string) || (token.email as string) || "",
+        avatar: (token as unknown as { avatar?: string | null }).avatar ?? (token as unknown as { image?: string }).image ?? null,
+        roleId: token.roleId ?? null,
+        roleName: token.roleName ?? null,
+        status: (token.status as string) || "INACTIVE",
+      };
+
       return session;
     },
   },
 
-  session: {
-    strategy: "jwt",
-  },
-
   pages: {
     signIn: "/signin",
+    error: "/signin", // show auth errors on the sign-in page
   },
+
+  debug: !isProd,
 };
 
 export default authOptions;
