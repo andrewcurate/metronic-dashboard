@@ -1,301 +1,108 @@
-'use client';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+"use client";
 
-import { Suspense, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, Check, Eye, EyeOff } from 'lucide-react';
-import { signIn } from 'next-auth/react';
-import { useForm } from 'react-hook-form';
-import { apiFetch } from '@/lib/api';
-import { Alert, AlertIcon, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { LoaderCircleIcon } from 'lucide-react';
-import { Icons } from '@/components/common/icons';
-import { getSignupSchema, SignupSchemaType } from '../forms/signup-schema';
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "react-hot-toast";
 
-export default function Page() {
+export default function SignupPage() {
   const router = useRouter();
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [passwordConfirmationVisible, setPasswordConfirmationVisible] =
-    useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean | null>(false);
 
-  const form = useForm<SignupSchemaType>({
-    resolver: zodResolver(getSignupSchema()),
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      passwordConfirmation: '',
-      accept: false,
-    },
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const result = await form.trigger();
-    if (!result) return;
+  const [loading, setLoading] = useState(false);
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const handleVerifiedSubmit = async (token: string) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
     try {
-      const values = form.getValues();
-
-      setIsProcessing(true);
-      setError(null);
-
-      const response = await apiFetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-recaptcha-token': token,
-        },
-        body: JSON.stringify(values),
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
       });
 
-      if (!response.ok) {
-        const { message } = await response.json();
-        setError(message);
-      } else {
-        router.push('/');
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Signup failed");
       }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'An unexpected error occurred. Please try again.',
-      );
+
+      toast.success("Account created successfully!");
+      router.push("/signin");
+    } catch (error: any) {
+      toast.error(error.message || "Something went wrong");
     } finally {
-      setIsProcessing(false);
+      setLoading(false);
     }
   };
 
-  if (success) {
-    return (
-      <Alert onClose={() => setSuccess(false)}>
-        <AlertIcon>
-          <Check />
-        </AlertIcon>
-        <AlertTitle>
-          You have successfully signed up! Please check your email to verify
-          your account and then{' '}
-          <Link
-            href="/signin/"
-            className="text-primary hover:text-primary-darker"
-          >
-            Log in
-          </Link>
-          .
-        </AlertTitle>
-      </Alert>
-    );
-  }
-
   return (
-    <Suspense>
-      <Form {...form}>
-        <form onSubmit={handleSubmit} className="block w-full space-y-5">
-          <div className="space-y-1.5 pb-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign Up to Metronic
-            </h1>
-          </div>
-
-          <div className="flex flex-col gap-3.5">
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => signIn('google', { callbackUrl: '/' })}
-            >
-              <Icons.googleColorful className="size-4!" /> Sign up with Google
-            </Button>
-          </div>
-
-          <div className="relative py-1.5">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                or
-              </span>
-            </div>
-          </div>
-
-          {error && (
-            <Alert variant="destructive" onClose={() => setError(null)}>
-              <AlertIcon>
-                <AlertCircle />
-              </AlertIcon>
-              <AlertTitle>{error}</AlertTitle>
-            </Alert>
-          )}
-
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your Name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your email" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <div className="relative">
-                  <Input
-                    placeholder="Your password"
-                    type={passwordVisible ? 'text' : 'password'}
-                    {...field}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    mode="icon"
-                    size="sm"
-                    onClick={() => setPasswordVisible(!passwordVisible)}
-                    className="absolute end-0 top-1/2 -translate-y-1/2 h-7 w-7 me-1.5 bg-transparent!"
-                    aria-label={
-                      passwordVisible ? 'Hide password' : 'Show password'
-                    }
-                  >
-                    {passwordVisible ? (
-                      <EyeOff className="text-muted-foreground" />
-                    ) : (
-                      <Eye className="text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="passwordConfirmation"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
-                <div className="relative">
-                  <Input
-                    type={passwordConfirmationVisible ? 'text' : 'password'}
-                    {...field}
-                    placeholder="Confirm your password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    mode="icon"
-                    size="sm"
-                    onClick={() =>
-                      setPasswordConfirmationVisible(
-                        !passwordConfirmationVisible,
-                      )
-                    }
-                    className="absolute end-0 top-1/2 -translate-y-1/2 h-7 w-7 me-1.5 bg-transparent!"
-                    aria-label={
-                      passwordConfirmationVisible
-                        ? 'Hide password confirmation'
-                        : 'Show password confirmation'
-                    }
-                  >
-                    {passwordConfirmationVisible ? (
-                      <EyeOff className="text-muted-foreground" />
-                    ) : (
-                      <Eye className="text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="flex items-center space-x-2">
-            <FormField
-              control={form.control}
-              name="accept"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <div className="flex items-center gap-2.5">
-                      <Checkbox
-                        id="accept"
-                        checked={field.value}
-                        onCheckedChange={(checked) => field.onChange(!!checked)}
-                      />
-                      <label
-                        htmlFor="accept"
-                        className="text-sm leading-none text-muted-foreground"
-                      >
-                        I agree to the
-                      </label>
-                      <Link
-                        href="/privacy-policy"
-                        target="_blank"
-                        className="-ms-0.5 text-sm font-semibold text-foreground hover:text-primary"
-                      >
-                        Privacy Policy
-                      </Link>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+    <div className="flex flex-col items-center justify-center min-h-screen px-4">
+      <div className="w-full max-w-md bg-white rounded-xl shadow p-6 space-y-6">
+        <h1 className="text-2xl font-bold text-center">Sign Up</h1>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Your full name"
+              required
             />
           </div>
-
-         
-
-          <div className="text-sm text-muted-foreground text-center">
-            Already have an account?{' '}
-            <Link
-              href="/signin"
-              className="text-sm text-sm font-semibold text-foreground hover:text-primary"
-            >
-              Sign In
-            </Link>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="you@example.com"
+              required
+            />
           </div>
+          <div>
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              value={form.password}
+              onChange={handleChange}
+              placeholder="••••••••"
+              required
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Creating account..." : "Sign Up"}
+          </Button>
         </form>
-      </Form>
-    </Suspense>
+        <p className="text-center text-sm">
+          Already have an account?{" "}
+          <Link href="/signin" className="text-primary underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 }
