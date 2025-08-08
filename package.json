@@ -9,7 +9,8 @@
     "build:staging": "cp .env.staging .env.local && next build",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "prebuild": "prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js",
@@ -70,7 +71,7 @@
     "zod": "^3.25.67"
   },
   "devDependencies": {
-    "@prisma/client": "^6.10.1",
+    "@prisma/client": "^6.13.0",
     "@tailwindcss/postcss": "^4.1.10",
     "@types/bcrypt": "^5.0.2",
     "@types/leaflet": "^1.9.19",
@@ -88,7 +89,7 @@
     "prettier": "^3.6.1",
     "prettier-plugin-organize-imports": "^4.1.0",
     "prettier-plugin-tailwindcss": "^0.6.13",
-    "prisma": "^6.10.1",
+    "prisma": "^6.13.0",
     "tailwindcss": "^4.1.10",
     "typescript": "^5.8.3"
   }
