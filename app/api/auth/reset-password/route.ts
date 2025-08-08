@@ -1,28 +1,10 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { verifyRecaptchaToken } from '@/lib/recaptcha';
 import { sendEmail } from '@/services/send-email';
 
 export async function POST(req: NextRequest) {
   try {
-    const recaptchaToken = req.headers.get('x-recaptcha-token');
-
-    if (!recaptchaToken) {
-      return NextResponse.json(
-        { message: 'Please complete the reCAPTCHA verification.' },
-        { status: 400 },
-      );
-    }
-
-    const isValidToken = await verifyRecaptchaToken(recaptchaToken);
-
-    if (!isValidToken) {
-      return NextResponse.json(
-        { message: 'reCAPTCHA verification failed. Please try again.' },
-        { status: 400 },
-      );
-    }
 
     const { email } = await req.json();
 

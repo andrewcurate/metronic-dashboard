@@ -22,7 +22,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { LoaderCircleIcon } from 'lucide-react';
 import { Icons } from '@/components/common/icons';
-import { RecaptchaPopover } from '@/components/common/recaptcha-popover';
 import { getSignupSchema, SignupSchemaType } from '../forms/signup-schema';
 
 export default function Page() {
@@ -33,7 +32,6 @@ export default function Page() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean | null>(false);
-  const [showRecaptcha, setShowRecaptcha] = useState(false);
 
   const form = useForm<SignupSchemaType>({
     resolver: zodResolver(getSignupSchema()),
@@ -51,7 +49,6 @@ export default function Page() {
     const result = await form.trigger();
     if (!result) return;
 
-    setShowRecaptcha(true);
   };
 
   const handleVerifiedSubmit = async (token: string) => {
@@ -60,7 +57,6 @@ export default function Page() {
 
       setIsProcessing(true);
       setError(null);
-      setShowRecaptcha(false);
 
       const response = await apiFetch('/api/auth/signup', {
         method: 'POST',
@@ -289,10 +285,8 @@ export default function Page() {
 
           <div className="flex flex-col gap-2.5">
             <RecaptchaPopover
-              open={showRecaptcha}
               onOpenChange={(open) => {
                 if (!open) {
-                  setShowRecaptcha(false);
                 }
               }}
               onVerify={handleVerifiedSubmit}
