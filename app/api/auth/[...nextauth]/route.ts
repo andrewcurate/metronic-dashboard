@@ -2,10 +2,14 @@ import NextAuth, { type NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import type { Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 
 const prisma = new PrismaClient();
 
-// DO NOT export this constant — Next.js route files should only export HTTP verbs.
+type JwtWithUserId = JWT & { userId?: string };
+type SessionWithUserId = Session & { userId?: string };
+
 const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
@@ -22,14 +26,14 @@ const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
-          include: { role: true }, // role relation exists in your schema
+          include: { role: true },
         });
         if (!user || !user.password) return null;
 
         const ok = await bcrypt.compare(credentials.password, user.password);
         if (!ok) return null;
 
-        // You can add fields to the JWT via callbacks if you need role info later
+        // Return a minimal user object; NextAuth will put this into the JWT once
         return {
           id: user.id,
           email: user.email,
@@ -39,24 +43,23 @@ const authOptions: NextAuthOptions = {
     }),
   ],
 
-  // Optional: enrich the JWT/session with role info if you use it in the UI
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.userId = user.id;
+    async jwt({ token, user }): Promise<JwtWithUserId> {
+      const t = token as JwtWithUserId;
+      if (user && "id" in user && typeof (user as { id?: unknown }).id === "string") {
+        t.userId = (user as { id: string }).id;
       }
-      return token;
+      return t;
     },
-    async session({ session, token }) {
-      if (token?.userId) {
-        (session as any).userId = token.userId;
-      }
-      return session;
+    async session({ session, token }): Promise<SessionWithUserId> {
+      const t = token as JwtWithUserId;
+      return {
+        ...session,
+        userId: t.userId,
+      };
     },
   },
 };
 
 const handler = NextAuth(authOptions);
-
-// ✅ Only export HTTP verbs
 export { handler as GET, handler as POST };
