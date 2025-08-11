@@ -308,6 +308,16 @@ export const MENU_SIDEBAR: MenuConfig = [
     ],
   },
   {
+    title: 'Patient Management',
+    icon: PeopleIcon,
+    children: [
+      {
+        title: 'Patients',
+        path: '/patient-management/patients',
+      },
+    ],
+  },
+  {
     title: 'Store - Client',
     icon: Users,
     children: [
@@ -436,6 +446,13 @@ export const MENU_SIDEBAR_CUSTOM: MenuConfig = [
       },
       { title: 'My Orders', path: '/store-client/my-orders' },
       { title: 'Order Receipt', path: '/store-client/order-receipt' },
+    ],
+  },
+  {
+    title: 'Patient Management',
+    icon: PeopleIcon,
+    children: [
+      { title: 'Patients', path: '/patient-management/patients' },
     ],
   },
 ];
@@ -699,6 +716,16 @@ export const MENU_SIDEBAR_COMPACT: MenuConfig = [
       {
         title: 'Settings',
         path: '/user-management/settings',
+      },
+    ],
+  },
+  {
+    title: 'Patient Management',
+    icon: PeopleIcon,
+    children: [
+      {
+        title: 'Patients',
+        path: '/patient-management/patients',
       },
     ],
   },
@@ -1437,6 +1464,13 @@ export const MENU_MEGA_MOBILE: MenuConfig = [
     ],
   },
   {
+    title: 'Patient Management',
+    icon: PeopleIcon,
+    children: [
+      { title: 'Patients', path: '/patient-management/patients' },
+    ],
+  },
+  {
     title: 'Store - Client',
     children: [
       { title: 'Home', path: '/store-client/home' },
@@ -1560,5 +1594,12 @@ export const MENU_ROOT: MenuConfig = [
     rootPath: '/user-management/',
     path: '/user-management/users',
     childrenIndex: 7,
+  },
+  {
+    title: 'Patient Management',
+    icon: PeopleIcon,
+    rootPath: '/patient-management/',
+    path: '/patient-management/patients',
+    childrenIndex: 8,
   },
 ];
