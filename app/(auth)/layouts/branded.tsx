@@ -27,9 +27,9 @@ export function BrandedLayout({ children }: { children: ReactNode }) {
           <div className="flex flex-col p-8 lg:p-16 gap-4">
             <Link href="/">
               <img
-                src={toAbsoluteUrl('/media/app/mini-logo.svg')}
+                src={toAbsoluteUrl('/media/app/medical-mini-logo.svg')}
                 className="h-[28px] max-w-none"
-                alt=""
+                alt="Medical Logo"
               />
             </Link>
 
@@ -43,7 +43,7 @@ export function BrandedLayout({ children }: { children: ReactNode }) {
                 <span className="text-mono font-semibold">
                   efficient user access
                 </span>
-                &nbsp;to the Metronic
+                &nbsp;to the MediBoard
                 <br /> Dashboard interface.
               </div>
             </div>

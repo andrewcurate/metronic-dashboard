@@ -26,7 +26,7 @@ export function OrderReceipt() {
             <div className="flex flex-col items-center gap-3 mb-5 lg:mb-9">
               <Link href="#" className="dark:hidden">
                 <img
-                  src={toAbsoluteUrl('/media/app/default-logo.svg')}
+                  src={toAbsoluteUrl('/media/app/medical-logo.svg')}
                   className="default-logo h-[22px]"
                   alt="image"
                 />
@@ -34,7 +34,7 @@ export function OrderReceipt() {
 
               <Link href="#" className="hidden dark:block">
                 <img
-                  src={toAbsoluteUrl('/media/app/default-logo-dark.svg')}
+                  src={toAbsoluteUrl('/media/app/medical-logo.svg')}
                   className="default-logo h-[22px]"
                   alt="image"
                 />
