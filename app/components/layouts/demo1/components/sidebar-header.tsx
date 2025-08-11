@@ -22,26 +22,26 @@ export function SidebarHeader() {
       <Link href="/">
         <div className="dark:hidden">
           <img
-            src={toAbsoluteUrl('/media/app/default-logo.svg')}
+            src={toAbsoluteUrl('/media/app/medical-logo.svg')}
             className="default-logo h-[22px] max-w-none"
-            alt="Default Logo"
+            alt="Medical Logo"
           />
           <img
-            src={toAbsoluteUrl('/media/app/mini-logo.svg')}
+            src={toAbsoluteUrl('/media/app/medical-mini-logo.svg')}
             className="small-logo h-[22px] max-w-none"
-            alt="Mini Logo"
+            alt="Medical Mini Logo"
           />
         </div>
         <div className="hidden dark:block">
           <img
-            src={toAbsoluteUrl('/media/app/default-logo-dark.svg')}
+            src={toAbsoluteUrl('/media/app/medical-logo.svg')}
             className="default-logo h-[22px] max-w-none"
-            alt="Default Dark Logo"
+            alt="Medical Logo"
           />
           <img
-            src={toAbsoluteUrl('/media/app/mini-logo.svg')}
+            src={toAbsoluteUrl('/media/app/medical-mini-logo.svg')}
             className="small-logo h-[22px] max-w-none"
-            alt="Mini Logo"
+            alt="Medical Mini Logo"
           />
         </div>
       </Link>

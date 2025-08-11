@@ -71,7 +71,7 @@ export default function SignUpPage() {
     <div className="flex min-h-[70vh] items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1 className="mb-6 text-center text-2xl font-semibold">
-          Sign Up to Metronic
+          Sign Up to MediBoard
         </h1>
 
         {formError && (

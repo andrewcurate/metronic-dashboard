@@ -13,9 +13,13 @@
   *:focus-visible {
     @apply outline-ring rounded-xs shadow-none outline-2 outline-offset-3 transition-none!;
   }
+
+  a {
+    @apply text-primary;
+  }
 }
 
-/* Metronic Components  */
+/* Component Styles */
 @import './components/image-input.css';
 @import './components/apexcharts.css';
 @import './components/leaflet.css';
