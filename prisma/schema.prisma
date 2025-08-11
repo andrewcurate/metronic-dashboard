@@ -36,6 +36,8 @@ model User {
   systemLog       SystemLog[]
   accounts        Account[]
   Session         Session[]
+  patient         Patient?
+  doctor          Doctor?
 
   // Indexes for efficient querying
   @@index([invitedByUserId])
@@ -167,4 +169,36 @@ model SystemSetting {
   notifySystemErrorFailureEmail  Boolean  @default(true)
   notifySystemErrorWeb           Boolean  @default(true)
   notifySystemErrorRoleIds       String[]
+}
+
+model Patient {
+  id          String        @id @default(uuid())
+  userId      String        @unique
+  dateOfBirth DateTime?
+  user        User          @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+}
+
+model Doctor {
+  id          String        @id @default(uuid())
+  userId      String        @unique
+  specialty   String?
+  user        User          @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+}
+
+model Appointment {
+  id          String   @id @default(uuid())
+  patientId   String
+  doctorId    String
+  scheduledAt DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  doctor  Doctor  @relation(fields: [doctorId], references: [id])
+
+  @@index([patientId])
+  @@index([doctorId])
 }
