@@ -63,9 +63,9 @@ export function Header() {
         <div className="flex gap-1 lg:hidden items-center gap-2.5">
           <Link href="/" className="shrink-0">
             <img
-              src={toAbsoluteUrl('/media/app/mini-logo.svg')}
+              src={toAbsoluteUrl('/media/app/medical-mini-logo.svg')}
               className="h-[25px] w-full"
-              alt="mini-logo"
+              alt="medical-logo"
             />
           </Link>
           <div className="flex items-center">
@@ -182,7 +182,7 @@ export function Header() {
               <UserDropdownMenu
                 trigger={
                   <img
-                    className="size-9 rounded-full border-2 border-green-500 shrink-0 cursor-pointer"
+                    className="size-9 rounded-full border-2 border-primary shrink-0 cursor-pointer"
                     src={toAbsoluteUrl('/media/avatars/300-2.png')}
                     alt="User Avatar"
                   />
